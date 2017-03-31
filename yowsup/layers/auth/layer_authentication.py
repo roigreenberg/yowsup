@@ -49,8 +49,11 @@ class YowAuthenticationProtocolLayer(YowProtocolLayer):
         if self._credentials:
             return self._credentials[0] if not full else ("%s@%s" % (self._credentials[0], YowConstants.WHATSAPP_SERVER))
         else:
-            prop = self.getProp(YowAuthenticationProtocolLayer.PROP_CREDENTIALS)
-            return prop[0] if prop else None
+            # prop = self.getProp(YowAuthenticationProtocolLayer.PROP_CREDENTIALS)  #Original line
+            prop = self.getProp(YowAuthenticationProtocolLayer.PROP_CREDENTIALS)[0] if not full else ("%s@%s" % (
+                self.getProp(YowAuthenticationProtocolLayer.PROP_CREDENTIALS)[0], YowConstants.WHATSAPP_SERVER))
+            # return prop[0] if prop else None  #Original line
+            return prop if prop else None
 
     @EventCallback(YowNetworkLayer.EVENT_STATE_CONNECTED)
     def onConnected(self, yowLayerEvent):
