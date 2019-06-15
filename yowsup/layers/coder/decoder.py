@@ -2,18 +2,22 @@ from yowsup.structs import ProtocolTreeNode
 import math
 import binascii
 import sys
+import zlib
+
+
 class ReadDecoder:
     def __init__(self, tokenDictionary):
-        self.streamStarted = False;
         self.tokenDictionary = tokenDictionary
 
-    def reset(self):
-        self.streamStarted = False
-
     def getProtocolTreeNode(self, data):
-        if not self.streamStarted:
-            return self.streamStart(data)
-        return self.nextTreeInternal(data)
+        if type(data) is list:
+            data = bytearray(data)
+
+        if data[0] & self.tokenDictionary.FLAG_DEFLATE != 0:
+            data = bytearray(b'\x00' + zlib.decompress(bytes(data[1:])))
+        if data[0] & self.tokenDictionary.FLAG_SEGMENTED != 0:
+            raise ValueError("server to client stanza fragmentation not supported")
+        return self.nextTreeInternal(data[1:])
 
     def getToken(self, index, data):
         token = self.tokenDictionary.getToken(index)
@@ -219,10 +223,8 @@ class ReadDecoder:
         raise Exception("readString couldn't match token "+str(token))
 
     def readArray(self, length, data):
-        out = []
-        for i in range(0, length):
-            out.append(data.pop(0))
-
+        out = data[:length]
+        del data[:length]
         return out
 
     def nextTreeInternal(self, data):
@@ -252,21 +254,17 @@ class ReadDecoder:
             nodeChildren = self.readList(read2, data)
         elif read2 == 252:
             size = self.readInt8(data)
-            nodeData = self.readArray(size, data)
+            nodeData = bytes(self.readArray(size, data))
         elif read2 == 253:
             size = self.readInt20(data)
-            nodeData = self.readArray(size, data)
+            nodeData = bytes(self.readArray(size, data))
         elif read2 == 254:
             size = self.readInt31(data)
-            nodeData = self.readArray(size, data)
+            nodeData = bytes(self.readArray(size, data))
         elif read2 in (255, 251):
             nodeData = self.readPacked8(read2, data)
         else:
             nodeData = self.readString(read2, data)
-
-        if nodeData and type(nodeData) is not str:
-            nodeData = "".join(map(chr, nodeData))
-
         return ProtocolTreeNode(tag, attribs, nodeChildren, nodeData)
 
     def readList(self,token, data):

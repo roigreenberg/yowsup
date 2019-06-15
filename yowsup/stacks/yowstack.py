@@ -1,12 +1,13 @@
 from yowsup.layers import YowParallelLayer
-import asyncore, time, logging, random
+import time, logging, random
 from yowsup.layers import YowLayer
-from yowsup.layers.auth                        import YowCryptLayer, YowAuthenticationProtocolLayer
+from yowsup.layers.noise.layer import YowNoiseLayer
+from yowsup.layers.noise.layer_noise_segments import YowNoiseSegmentsLayer
+from yowsup.layers.auth                        import YowAuthenticationProtocolLayer
 from yowsup.layers.coder                       import YowCoderLayer
 from yowsup.layers.logger                      import YowLoggerLayer
 from yowsup.layers.network                     import YowNetworkLayer
 from yowsup.layers.protocol_messages           import YowMessagesProtocolLayer
-from yowsup.layers.stanzaregulator             import YowStanzaRegulator
 from yowsup.layers.protocol_media              import YowMediaProtocolLayer
 from yowsup.layers.protocol_acks               import YowAckProtocolLayer
 from yowsup.layers.protocol_receipts           import YowReceiptProtocolLayer
@@ -20,15 +21,15 @@ from yowsup.layers.protocol_chatstate          import YowChatstateProtocolLayer
 from yowsup.layers.protocol_privacy            import YowPrivacyProtocolLayer
 from yowsup.layers.protocol_profiles           import YowProfilesProtocolLayer
 from yowsup.layers.protocol_calls import YowCallsProtocolLayer
-from yowsup.env import YowsupEnv
 from yowsup.common.constants import YowConstants
+from yowsup.layers.axolotl import AxolotlSendLayer, AxolotlControlLayer, AxolotlReceivelayer
+from yowsup.profile.profile import YowProfile
 import inspect
 try:
     import Queue
 except ImportError:
     import queue as Queue
 logger = logging.getLogger(__name__)
-
 
 YOWSUP_PROTOCOL_LAYERS_BASIC = (
     YowAuthenticationProtocolLayer, YowMessagesProtocolLayer,
@@ -38,17 +39,18 @@ YOWSUP_PROTOCOL_LAYERS_BASIC = (
 
 )
 
-class YowStackBuilder(object):
 
+class YowStackBuilder(object):
     def __init__(self):
         self.layers = ()
         self._props = {}
 
     def setProp(self, key, value):
         self._props[key] = value
+        return self
 
-    def pushDefaultLayers(self, axolotl = False):
-        defaultLayers = YowStackBuilder.getDefaultLayers(axolotl)
+    def pushDefaultLayers(self):
+        defaultLayers = YowStackBuilder.getDefaultLayers()
         self.layers += defaultLayers
         return self
 
@@ -64,15 +66,13 @@ class YowStackBuilder(object):
         return YowStack(self.layers, reversed = False, props = self._props)
 
     @staticmethod
-    def getDefaultLayers(axolotl = False, groups = True, media = True, privacy = True, profiles = True):
+    def getDefaultLayers(groups = True, media = True, privacy = True, profiles = True):
         coreLayers = YowStackBuilder.getCoreLayers()
         protocolLayers = YowStackBuilder.getProtocolLayers(groups = groups, media=media, privacy=privacy, profiles=profiles)
 
         allLayers = coreLayers
-        if axolotl:
-            from yowsup.layers.axolotl import AxolotlSendLayer, AxolotlControlLayer, AxolotlReceivelayer
-            allLayers += (AxolotlControlLayer,)
-            allLayers += (YowParallelLayer((AxolotlSendLayer, AxolotlReceivelayer)),)
+        allLayers += (AxolotlControlLayer,)
+        allLayers += (YowParallelLayer((AxolotlSendLayer, AxolotlReceivelayer)),)
 
         allLayers += (YowParallelLayer(protocolLayers),)
 
@@ -98,8 +98,8 @@ class YowStackBuilder(object):
         return (
             YowLoggerLayer,
             YowCoderLayer,
-            YowCryptLayer,
-            YowStanzaRegulator,
+            YowNoiseLayer,
+            YowNoiseSegmentsLayer,
             YowNetworkLayer
         )[::-1]
 
@@ -131,8 +131,6 @@ class YowStack(object):
         self._props = props or {}
 
         self.setProp(YowNetworkLayer.PROP_ENDPOINT, YowConstants.ENDPOINTS[random.randint(0,len(YowConstants.ENDPOINTS)-1)])
-        self.setProp(YowCoderLayer.PROP_DOMAIN, YowConstants.DOMAIN)
-        self.setProp(YowCoderLayer.PROP_RESOURCE, YowsupEnv.getCurrent().getResource())
         self._construct()
 
 
@@ -153,7 +151,19 @@ class YowStack(object):
         self.__stackInstances[0].receive(data)
 
     def setCredentials(self, credentials):
-        self.getLayerInterface(YowAuthenticationProtocolLayer).setCredentials(*credentials)
+        logger.warning("setCredentials is deprecated and any passed-in keypair is ignored, "
+                       "use setProfile(YowProfile) instead")
+        profile_name, keypair = credentials
+        self.setProfile(YowProfile(profile_name))
+
+    def setProfile(self, profile):
+        # type: (str | YowProfile) -> None
+        """
+        :param profile: profile to use.
+        :return:
+        """
+        logger.debug("setProfile(%s)" % profile)
+        self.setProp("profile", profile if isinstance(profile, YowProfile) else YowProfile(profile))
 
     def addLayer(self, layerClass):
         self.__stack.push(layerClass)
@@ -181,19 +191,13 @@ class YowStack(object):
         self.__class__.__detachedQueue.put(fn)
 
     def loop(self, *args, **kwargs):
-        if "discrete" in kwargs:
-            discreteVal = kwargs["discrete"]
-            del kwargs["discrete"]
-            while True:
-                asyncore.loop(*args, **kwargs)
-                time.sleep(discreteVal)
-                try:
-                    callback = self.__class__.__detachedQueue.get(False) #doesn't block
-                    callback()
-                except Queue.Empty:
-                    pass
-        else:
-            asyncore.loop(*args, **kwargs)
+        while True:
+            try:
+                callback = self.__class__.__detachedQueue.get(False) #doesn't block
+                callback()
+            except Queue.Empty:
+                pass
+            time.sleep(0.1)
 
     def _construct(self):
         logger.debug("Initializing stack")

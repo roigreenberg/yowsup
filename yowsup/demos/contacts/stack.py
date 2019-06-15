@@ -1,33 +1,32 @@
 from .layer import SyncLayer
 
 from yowsup.stacks import  YowStackBuilder
-from yowsup.layers.auth import AuthError
 from yowsup.layers import YowLayerEvent
 from yowsup.layers.auth import YowAuthenticationProtocolLayer
 from yowsup.layers.network import YowNetworkLayer
 
+
 class YowsupSyncStack(object):
-    def __init__(self, credentials, contacts, encryptionEnabled = False):
+    def __init__(self, profile, contacts):
         """
-        :param credentials:
+        :param profile:
         :param contacts: list of [jid ]
-        :param encryptionEnabled:
         :return:
         """
         stackBuilder = YowStackBuilder()
 
-        self.stack = stackBuilder \
-            .pushDefaultLayers(encryptionEnabled) \
+        self._stack = stackBuilder \
+            .pushDefaultLayers() \
             .push(SyncLayer) \
             .build()
 
-        self.stack.setProp(SyncLayer.PROP_CONTACTS, contacts)
-        self.stack.setProp(YowAuthenticationProtocolLayer.PROP_PASSIVE, True)
-        self.stack.setCredentials(credentials)
+        self._stack.setProp(SyncLayer.PROP_CONTACTS, contacts)
+        self._stack.setProp(YowAuthenticationProtocolLayer.PROP_PASSIVE, True)
+        self._stack.setProfile(profile)
+
+    def set_prop(self, key, val):
+        self._stack.setProp(key, val)
 
     def start(self):
-        self.stack.broadcastEvent(YowLayerEvent(YowNetworkLayer.EVENT_STATE_CONNECT))
-        try:
-            self.stack.loop()
-        except AuthError as e:
-            print("Authentication Error: %s" % e.message)
+        self._stack.broadcastEvent(YowLayerEvent(YowNetworkLayer.EVENT_STATE_CONNECT))
+        self._stack.loop()

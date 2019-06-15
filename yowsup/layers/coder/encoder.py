@@ -2,31 +2,12 @@ class WriteEncoder:
 
     def __init__(self, tokenDictionary):
         self.tokenDictionary = tokenDictionary
-        self.streamStarted = False
-
-    def reset(self):
-        self.streamStarted = False
-
-    def getStreamStartBytes(self, domain, resource):
-        data = []
-        self.streamStarted = True
-        data.append(87)
-        data.append(65)
-        data.append(1)
-        data.append(6)
-
-        streamOpenAttributes = {"to": domain, "resource": resource}
-        self.writeListStart(len(streamOpenAttributes) * 2 + 1, data)
-        data.append(1);
-        self.writeAttributes(streamOpenAttributes, data)
-        return data
 
     def protocolTreeNodeToBytes(self, node):
-        outBytes = []
+        outBytes = [0] # flags
         self.writeInternal(node, outBytes)
 
         return outBytes
-
 
     def writeInternal(self, node, data):
 
@@ -136,9 +117,23 @@ class WriteEncoder:
         tok = self.tokenDictionary.getIndex(tag)
         if tok:
             index, secondary = tok
-            if secondary:
-                self.writeToken(236, data)
-            self.writeToken(index, data)
+            if not secondary:
+                self.writeToken(index, data)
+            else:
+                quotient = index // 256
+                if quotient == 0:
+                    double_byte_token = 236
+                elif quotient == 1:
+                    double_byte_token = 237
+                elif quotient == 2:
+                    double_byte_token = 238
+                elif quotient == 3:
+                    double_byte_token = 239
+                else:
+                    raise ValueError("Double byte dictionary token out of range")
+
+                self.writeToken(double_byte_token, data)
+                self.writeToken(index % 256, data)
         else:
             at = '@'.encode() if type(tag) == bytes else '@'
             try:

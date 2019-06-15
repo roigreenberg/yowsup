@@ -1,6 +1,3 @@
-import time,datetime,re, hashlib
-import calendar
-from dateutil import tz
 import os
 from .constants import YowConstants
 import codecs, sys
@@ -9,6 +6,10 @@ import tempfile
 import base64
 import hashlib
 import os.path, mimetypes
+import uuid
+from consonance.structs.keypair import KeyPair
+from appdirs import user_config_dir
+
 from .optionalmodules import PILOptionalModule, FFVideoOptionalModule
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,38 @@ class WATools:
     def generateIdentity():
         return os.urandom(20)
 
+    @classmethod
+    def generatePhoneId(cls):
+        """
+        :return:
+        :rtype: str
+        """
+        return str(cls.generateUUID())
+
+    @classmethod
+    def generateDeviceId(cls):
+        """
+        :return:
+        :rtype: bytes
+        """
+        return cls.generateUUID().bytes
+
+    @classmethod
+    def generateUUID(cls):
+        """
+        :return:
+        :rtype: uuid.UUID
+        """
+        return uuid.uuid4()
+
+    @classmethod
+    def generateKeyPair(cls):
+        """
+        :return:
+        :rtype: KeyPair
+        """
+        return KeyPair.generate()
+
     @staticmethod
     def getFileHashForUpload(filePath):
         sha1 = hashlib.sha256()
@@ -47,73 +80,55 @@ class WATools:
         b64Hash = base64.b64encode(sha1.digest())
         return b64Hash if type(b64Hash) is str else b64Hash.decode()
 
+
 class StorageTools:
+    NAME_CONFIG = "config.json"
+
     @staticmethod
     def constructPath(*path):
         path = os.path.join(*path)
-        fullPath = os.path.expanduser(os.path.join(YowConstants.PATH_STORAGE, path))
+        fullPath = os.path.join(user_config_dir(YowConstants.YOWSUP), path)
         if not os.path.exists(os.path.dirname(fullPath)):
             os.makedirs(os.path.dirname(fullPath))
         return fullPath
 
     @staticmethod
-    def getStorageForPhone(phone):
-        return StorageTools.constructPath(phone + '/')
+    def getStorageForProfile(profile_name):
+        if type(profile_name) is not str:
+            profile_name = str(profile_name)
+        return StorageTools.constructPath(profile_name)
 
     @staticmethod
-    def writeIdentity(phone, identity):
-        path = StorageTools.getStorageForPhone(phone)
-        with open(os.path.join(path, "id"), 'wb') as idFile:
-            idFile.write(identity)
+    def writeProfileData(profile_name, name, val):
+        logger.debug("writeProfileData(profile_name=%s, name=%s, val=[omitted])" % (profile_name, name))
+        path = os.path.join(StorageTools.getStorageForProfile(profile_name), name)
+        logger.debug("Writing %s" % path)
+
+        with open(path, 'w' if type(val) is str else 'wb') as attrFile:
+            attrFile.write(val)
 
     @staticmethod
-    def getIdentity(phone):
-        path = StorageTools.getStorageForPhone(phone)
-        out = None
-        idPath = os.path.join(path, "id")
-        if os.path.isfile(idPath):
-            with open(idPath, 'rb') as idFile:
-                out = idFile.read()
-        return out
+    def readProfileData(profile_name, name, default=None):
+        logger.debug("readProfileData(profile_name=%s, name=%s)" % (profile_name, name))
+        path = StorageTools.getStorageForProfile(profile_name)
+        dataFilePath = os.path.join(path, name)
+        if os.path.isfile(dataFilePath):
+            logger.debug("Reading %s" % dataFilePath)
+            with open(dataFilePath, 'rb') as attrFile:
+                return attrFile.read()
+        else:
+            logger.debug("%s does not exist" % dataFilePath)
 
-    @staticmethod
-    def writeNonce(phone, nonce):
-        path = StorageTools.getStorageForPhone(phone)
-        with open(os.path.join(path, "nonce"), 'wb') as idFile:
-            idFile.write(nonce.encode("latin-1") if sys.version_info >= (3,0) else nonce)
+        return default
 
-    @staticmethod
-    def getNonce(phone):
-        path = StorageTools.getStorageForPhone(phone)
-        out = None
-        noncePath = os.path.join(path, "nonce")
-        if os.path.isfile(noncePath):
-            with open(noncePath, 'rb') as idFile:
-                out = idFile.read()
-        return out
+    @classmethod
+    def writeProfileConfig(cls, profile_name, config):
+        cls.writeProfileData(profile_name, cls.NAME_CONFIG, config)
 
-class TimeTools:
-    @staticmethod
-    def parseIso(iso):
-        d=datetime.datetime(*map(int, re.split('[^\d]', iso)[:-1]))
-        return d
+    @classmethod
+    def readProfileConfig(cls, profile_name, config):
+        return cls.readProfileData(profile_name, cls.NAME_CONFIG)
 
-    @staticmethod
-    def utcToLocal(dt):
-        utc = tz.gettz('UTC')
-        local = tz.tzlocal()
-        dtUtc =  dt.replace(tzinfo=utc)
-
-        return dtUtc.astimezone(local)
-
-    @staticmethod
-    def utcTimestamp():
-        utcNow = datetime.datetime.utcnow()
-        return calendar.timegm(utcNow.timetuple())
-
-    @staticmethod
-    def datetimeToTimestamp(dt):
-        return time.mktime(dt.timetuple())
 
 class ImageTools:
     @staticmethod

@@ -1,81 +1,104 @@
-from yowsup.structs import ProtocolEntity, ProtocolTreeNode
+from yowsup.layers.protocol_messages.protocolentities.attributes.attributes_message_meta import MessageMetaAttributes
 from .message_media import MediaMessageProtocolEntity
+from yowsup.layers.protocol_messages.protocolentities.attributes.attributes_location import LocationAttributes
+from yowsup.layers.protocol_messages.protocolentities.attributes.attributes_message import MessageAttributes
+
 
 class LocationMediaMessageProtocolEntity(MediaMessageProtocolEntity):
-    '''
-    <message t="{{TIME_STAMP}}" from="{{CONTACT_JID}}" 
-    offline="{{OFFLINE}}" type="text" id="{{MESSAGE_ID}}" notify="{{NOTIFY_NAME}}">
-        <media 
-            latitude="52.52393" 
-            type="location"
-            longitude="13.41747"
-            name="Location Name"
-            url="http://www.foursquare.com/XXXX"
-            encoding="raw"
-        >{{THUMBNAIL_RAWDATA}}</media>
-    </message>
-    '''
+    def __init__(self, location_attrs, message_meta_attrs):
+        # type: (LocationAttributes, MessageMetaAttributes) -> None
+        super(LocationMediaMessageProtocolEntity, self).__init__(
+            "location", MessageAttributes(location=location_attrs), message_meta_attrs
+        )
 
+    @property
+    def media_specific_attributes(self):
+        return self.message_attributes.contact
 
-    def __init__(self, latitude, longitude, name, url, encoding, _id = None, _from = None, to = None, notify = None, timestamp = None, participant = None,
-            preview = None, offline = None, retry = None):
+    @property
+    def degrees_latitude(self):
+        return self.media_specific_attributes.degrees_latitude
 
-        super(LocationMediaMessageProtocolEntity, self).__init__("location", _id, _from, to, notify, timestamp, participant, preview, offline, retry)
-        self.setLocationMediaProps(latitude,longitude,name,url,encoding)
+    @degrees_latitude.setter
+    def degrees_latitude(self, value):
+        self.media_specific_attributes.degrees_latitude = value
 
-    def __str__(self):
-        out  = super(MediaMessageProtocolEntity, self).__str__()
-        out += "Latitude: %s\n" % self.latitude
-        out += "Longitude: %s\n" % self.longitude
-        out += "Name: %s\n" % self.name
-        out += "URL: %s\n" % self.url
-        out += "Encoding: %s\n" % self.encoding
+    @property
+    def degrees_longitude(self):
+        return self.media_specific_attributes.degrees_longitude
 
-        return out
+    @degrees_longitude.setter
+    def degrees_longitude(self, value):
+        self.media_specific_attributes.degrees_longitude = value
 
-    def getLatitude(self):
-        return self.latitude
+    @property
+    def name(self):
+        return self.media_specific_attributes.name
 
-    def getLongitude(self):
-        return self.longitude
+    @name.setter
+    def name(self, value):
+        self.media_specific_attributes.name = value
 
-    def getLocationName(self):
-        return self.name
+    @property
+    def address(self):
+        return self.proto.addrees
 
-    def getLocationURL(self):
-        return self.url
+    @address.setter
+    def address(self, value):
+        self.media_specific_attributes.address = value
 
-    def setLocationMediaProps(self, latitude, longitude, locationName, url, encoding):
-        self.latitude = str(latitude)
-        self.longitude = str(longitude)
-        self.name = locationName
-        self.url = url
-        self.encoding= encoding
+    @property
+    def url(self):
+        return self.media_specific_attributes.url
 
-    def toProtocolTreeNode(self):
-        node = super(LocationMediaMessageProtocolEntity, self).toProtocolTreeNode()
-        mediaNode = node.getChild("media")
-        mediaNode.setAttribute("latitude",  self.latitude)
-        mediaNode.setAttribute("longitude",  self.longitude)
-        mediaNode.setAttribute("encoding", self.encoding)
+    @url.setter
+    def url(self, value):
+        self.media_specific_attributes.url = value
 
-        if self.name:
-            mediaNode.setAttribute("name", self.name)
-        if self.url:
-            mediaNode.setAttribute("url", self.url)
-            
-        return node
+    @property
+    def duration(self):
+        return self.media_specific_attributes.duration
 
-    @staticmethod
-    def fromProtocolTreeNode(node):
-        entity = MediaMessageProtocolEntity.fromProtocolTreeNode(node)
-        entity.__class__ = LocationMediaMessageProtocolEntity
-        mediaNode = node.getChild("media")
-        entity.setLocationMediaProps(
-            mediaNode.getAttributeValue("latitude"),
-            mediaNode.getAttributeValue("longitude"),
-            mediaNode.getAttributeValue("name"),
-            mediaNode.getAttributeValue("url"),
-            mediaNode.getAttributeValue("encoding")
-            )
-        return entity
+    @duration.setter
+    def duration(self, value):
+        self.media_specific_attributes.duration = value
+
+    @property
+    def accuracy_in_meters(self):
+        return self.media_specific_attributes.accuracy_in_meters
+
+    @accuracy_in_meters.setter
+    def accuracy_in_meters(self, value):
+        self.media_specific_attributes.accuracy_in_meters = value
+
+    @property
+    def speed_in_mps(self):
+        return self.media_specific_attributes.speed_in_mps
+
+    @speed_in_mps.setter
+    def speed_in_mps(self, value):
+        self.media_specific_attributes.speed_in_mps = value
+
+    @property
+    def degrees_clockwise_from_magnetic_north(self):
+        return self.media_specific_attributes.degrees_clockwise_from_magnetic_north
+
+    @degrees_clockwise_from_magnetic_north.setter
+    def degrees_clockwise_from_magnetic_north(self, value):
+        self.media_specific_attributes.degrees_clockwise_from_magnetic_north = value
+
+    @property
+    def axolotl_sender_key_distribution_message(self):
+        return self.media_specific_attributes.axolotl_sender_key_distribution_message
+
+    @axolotl_sender_key_distribution_message.setter
+    def axolotl_sender_key_distribution_message(self, value):
+        self.media_specific_attributes.axolotl_sender_key_distribution_message = value
+
+    @property
+    def jpeg_thumbnail(self):
+        return self.media_specific_attributes.jpeg_thumbnail
+
+    @jpeg_thumbnail.setter
+    def jpeg_thumbnail(self, value):
+        self.media_specific_attributes.jpeg_thumbnail = value

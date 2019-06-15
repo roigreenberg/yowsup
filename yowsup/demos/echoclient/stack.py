@@ -1,23 +1,23 @@
 from yowsup.stacks import  YowStackBuilder
 from .layer import EchoLayer
-from yowsup.layers.auth import AuthError
 from yowsup.layers import YowLayerEvent
 from yowsup.layers.network import YowNetworkLayer
 
+
 class YowsupEchoStack(object):
-    def __init__(self, credentials, encryptionEnabled = True):
+    def __init__(self, profile):
         stackBuilder = YowStackBuilder()
 
-        self.stack = stackBuilder\
-            .pushDefaultLayers(encryptionEnabled)\
+        self._stack = stackBuilder\
+            .pushDefaultLayers()\
             .push(EchoLayer)\
             .build()
 
-        self.stack.setCredentials(credentials)
+        self._stack.setProfile(profile)
+
+    def set_prop(self, key, val):
+        self._stack.setProp(key, val)
 
     def start(self):
-        self.stack.broadcastEvent(YowLayerEvent(YowNetworkLayer.EVENT_STATE_CONNECT))
-        try:
-            self.stack.loop()
-        except AuthError as e:
-            print("Authentication Error: %s" % e.message)
+        self._stack.broadcastEvent(YowLayerEvent(YowNetworkLayer.EVENT_STATE_CONNECT))
+        self._stack.loop()

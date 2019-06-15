@@ -1,29 +1,31 @@
-from yowsup.structs import ProtocolEntity, ProtocolTreeNode
+from yowsup.structs import ProtocolEntity
 from yowsup.layers.protocol_receipts.protocolentities  import OutgoingReceiptProtocolEntity
+from yowsup.layers.protocol_messages.protocolentities.attributes.attributes_message_meta import MessageMetaAttributes
 from copy import deepcopy
+
 
 class MessageProtocolEntity(ProtocolEntity):
 
     MESSAGE_TYPE_TEXT = "text"
     MESSAGE_TYPE_MEDIA = "media"
 
-    def __init__(self, _type, _id = None,  _from = None, to = None, notify = None, timestamp = None,
-        participant = None, offline = None, retry = None):
-
-        assert (to or _from), "Must specify either to or _from jids to create the message"
-        assert not(to and _from), "Can't set both attributes to message at same time (to, _from)"
-
-
+    def __init__(self, messageType, messageMetaAttributes):
+        """
+        :type messageType: str
+        :type messageMetaAttributes: MessageMetaAttributes
+        """
         super(MessageProtocolEntity, self).__init__("message")
-        self._type          = _type
-        self._id            = self._generateId() if _id is None else _id
-        self._from          =_from
-        self.to             = to
-        self.timestamp      = int(timestamp) if timestamp else self._getCurrentTimestamp()
-        self.notify         = notify
-        self.offline        = offline == "1" if offline is not None else offline
-        self.retry          = int(retry) if retry else None
-        self.participant    = participant
+        assert type(messageMetaAttributes) is MessageMetaAttributes
+
+        self._type = messageType
+        self._id = messageMetaAttributes.id or self._generateId()
+        self._from = messageMetaAttributes.sender
+        self.to = messageMetaAttributes.recipient
+        self.timestamp = messageMetaAttributes.timestamp or self._getCurrentTimestamp()
+        self.notify = messageMetaAttributes.notify
+        self.offline = messageMetaAttributes.offline
+        self.retry = messageMetaAttributes.retry
+        self.participant= messageMetaAttributes.participant
 
     def getType(self):
         return self._type
@@ -58,6 +60,9 @@ class MessageProtocolEntity(ProtocolEntity):
             "id"        : self._id,
         }
 
+        if self.participant:
+            attribs["participant"] = self.participant
+
         if self.isOutgoing():
             attribs["to"] = self.to
         else:
@@ -71,8 +76,6 @@ class MessageProtocolEntity(ProtocolEntity):
                 attribs["notify"] = self.notify
             if self.retry:
                 attribs["retry"] = str(self.retry)
-            if self.participant:
-                attribs["participant"] = self.participant
 
 
         xNode = None
@@ -113,15 +116,7 @@ class MessageProtocolEntity(ProtocolEntity):
 
     @staticmethod
     def fromProtocolTreeNode(node):
-
         return MessageProtocolEntity(
-            node.getAttributeValue("type"),
-            node.getAttributeValue("id"),
-            node.getAttributeValue("from"),
-            node.getAttributeValue("to"),
-            node.getAttributeValue("notify"),
-            node.getAttributeValue("t"),
-            node.getAttributeValue("participant"),
-            node.getAttributeValue("offline"),
-            node.getAttributeValue("retry")
-            )
+            node["type"],
+            MessageMetaAttributes.from_message_protocoltreenode(node)
+        )

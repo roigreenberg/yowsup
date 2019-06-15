@@ -4,13 +4,15 @@ from six import with_metaclass
 
 logger = logging.getLogger(__name__)
 
-DEFAULT = "s40"
+DEFAULT = "android"
+
 
 class YowsupEnvType(abc.ABCMeta):
     def __init__(cls, name, bases, dct):
         if name != "YowsupEnv":
             YowsupEnv.registerEnv(cls)
         super(YowsupEnvType, cls).__init__(name, bases, dct)
+
 
 class YowsupEnv(with_metaclass(YowsupEnvType, object)):
     __metaclass__ = YowsupEnvType
@@ -45,6 +47,9 @@ class YowsupEnv(with_metaclass(YowsupEnvType, object)):
 
     @classmethod
     def getCurrent(cls):
+        """
+        :rtype: YowsupEnv
+        """
         if cls.__CURR is None:
             env = DEFAULT
             envs = cls.getRegisteredEnvs()
@@ -78,21 +83,14 @@ class YowsupEnv(with_metaclass(YowsupEnvType, object)):
     def getManufacturer(self):
         pass
 
-    @abc.abstractmethod
-    def isAxolotlEnabled(self):
-        pass
-
     def getBuildVersion(self):
-        return ""
-
-    def getResource(self):
-        return self.getOSName() + "-" + self.getVersion()
+        pass
 
     def getUserAgent(self):
         return self.__class__._USERAGENT_STRING.format(
-            WHATSAPP_VERSION = self.getVersion(),
-            OS_NAME = self.getOSName(),
-            OS_VERSION = self.getOSVersion(),
-            MANUFACTURER = self.getManufacturer(),
-            DEVICE_NAME = self.getDeviceName()
+            WHATSAPP_VERSION=self.getVersion(),
+            OS_NAME=self.getOSName(),
+            OS_VERSION=self.getOSVersion(),
+            MANUFACTURER=self.getManufacturer(),
+            DEVICE_NAME=self.getDeviceName()
         )
